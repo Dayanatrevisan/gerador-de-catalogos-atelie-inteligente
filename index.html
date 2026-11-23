@@ -24,6 +24,12 @@
 <section class="hero"><div><div class="eyebrow">Sua marca, apresentada com profissionalismo</div><h1>Um catálogo que valoriza cada peça.</h1><p>Organize seus produtos, apresente seus preços de varejo e atacado e crie um PDF pronto para compartilhar com clientes e lojistas.</p></div><div class="hero-art"><div class="art-text">feito à mão,<br>com intenção.</div></div></section>
 <div class="layout"><nav class="steps" id="steps"><div class="step active"><span class="num">1</span><span>Sua marca</span></div><div class="step"><span class="num">2</span><span>Apresentação</span></div><div class="step"><span class="num">3</span><span>Produtos</span></div><div class="step"><span class="num">4</span><span>Condições</span></div><div class="step"><span class="num">5</span><span>Visualizar PDF</span></div></nav>
 <section class="panel" id="formPanel">
+<div class="draft-tools" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px;padding:13px;background:#f7f8f4;border:1px solid var(--line);border-radius:11px">
+  <button class="btn secondary" id="saveDraftFile" type="button">Guardar rascunho</button>
+  <button class="btn outline" id="openDraftFile" type="button">Abrir rascunho</button>
+  <input id="draftFile" type="file" accept=".json,application/json" style="display:none">
+  <span class="hint">O rascunho será baixado como um arquivo no seu dispositivo. Para continuar depois, abra esse arquivo aqui.</span>
+</div>
 <div class="page" data-page="0"><h2>Vamos começar pela sua marca</h2><p class="sub">Essas informações vão compor a capa e o contato do seu catálogo.</p><div class="fields"><div class="field full"><label>Nome da sua marca *</label><input id="brandName" placeholder="Ex.: Casa Botânica" required></div><div class="field"><label>Instagram</label><input id="instagram" placeholder="@suamarca"></div><div class="field"><label>WhatsApp / telefone</label><input id="whatsapp" placeholder="(00) 00000-0000"></div><div class="field"><label>E-mail</label><input id="email" type="email" placeholder="contato@suamarca.com"></div><div class="field"><label>Logotipo (opcional)</label><input id="logo" type="file" accept="image/*"><span class="hint">PNG ou JPG. Será inserido na capa.</span></div>
 <div class="field"><label>Foto de capa (opcional)</label><input id="coverPhoto" type="file" accept="image/*"><span class="hint">Uma imagem para valorizar a apresentação da marca.</span></div>
 <div class="field"><label>Estilo visual do catálogo</label><select id="catalogStyle"><option value="minimal">Minimalista</option><option value="editorial">Editorial</option><option value="commercial">Comercial</option></select></div><div class="field full"><label>Cor principal da sua marca</label><div style="display:flex;gap:10px;align-items:center"><input id="accent" type="color" value="#68745b" style="width:58px;height:43px;padding:4px"><span class="hint">Escolha uma cor que combine com sua identidade visual.</span></div></div></div></div>
@@ -48,7 +54,7 @@ function addProduct(data={}){
  const el=document.createElement('div');el.className='product';el.dataset.id=Date.now()+Math.random();
  el.innerHTML=`<div class="product-head"><strong>Nova peça</strong><div class="product-tools"><button class="mini-btn duplicate" type="button">Duplicar</button><button class="mini-btn up" type="button">↑ Subir</button><button class="mini-btn down" type="button">↓ Descer</button><button class="remove" type="button">Remover ×</button></div></div>
  <div class="fields">
- <div class="field full"><label>Fotos da peça e das opções de cores</label><div class="upload"><input class="photos" type="file" accept="image/*" multiple><div class="hint">Selecione várias imagens. Você pode identificar cada foto com o nome da cor ou acabamento. As imagens serão reduzidas automaticamente ao salvar.</div><div class="gallery"></div></div></div>
+ <div class="field full"><label>Fotos da peça e das opções de cores</label><div class="upload"><input class="photos" type="file" accept="image/*" multiple><div class="hint">Selecione várias imagens. Você pode identificar cada foto com o nome da cor ou acabamento. As fotos serão incluídas no arquivo do rascunho.</div><div class="gallery"></div></div></div>
  <div class="field"><label>Nome da peça *</label><input class="name" placeholder="Ex.: Bandeja orgânica"></div>
  <div class="field"><label>Categoria</label><input class="category" placeholder="Ex.: Bandejas, vasos, velas"></div>
  <div class="field"><label>Código / referência</label><input class="sku" placeholder="Ex.: B01"></div>
@@ -127,6 +133,70 @@ function cardsForSingle(p,mode){
 }
 function render(){const html=makeCatalog();$('previewMount').innerHTML=html;$('printMount').innerHTML=html}
 function showPage(n){current=n;pages.forEach((p,i)=>p.classList.toggle('hidden',i!==n));[...$('steps').children].forEach((s,i)=>s.classList.toggle('active',i===n));$('back').disabled=n===0;$('next').textContent=n===4?'Ver catálogo completo →':'Continuar →';if(n===4)render()}
+
+function setField(id,value){
+ const el=$(id); if(el && value!==undefined && value!==null) el.value=value;
+}
+function downloadDraft(){
+ try{
+  const data=getData();
+  const draft={format:'atelie-inteligente-draft',version:1,savedAt:new Date().toISOString(),data,logoData};
+  const blob=new Blob([JSON.stringify(draft)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const safeName=(data.brand||'catalogo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||'catalogo';
+  a.href=url;a.download=`rascunho-${safeName}.json`;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast('Rascunho baixado! Guarde o arquivo para continuar depois.');
+ }catch(err){
+  console.error(err);toast('Não foi possível gerar o rascunho. Tente novamente.');
+ }
+}
+function restoreDraft(draft){
+ const d=draft?.data;
+ if(!d || !Array.isArray(d.products)) throw new Error('Arquivo de rascunho inválido.');
+ setField('brandName',d.brand);
+ setField('instagram',d.instagram);
+ setField('whatsapp',d.whatsapp);
+ setField('email',d.email);
+ setField('accent',d.accent||'#68745b');
+ setField('intro',d.intro);
+ setField('tagline',d.tagline);
+ setField('lead',d.lead);
+ setField('minimum',d.minimum);
+ setField('payment',d.payment);
+ setField('shipping',d.shipping);
+ setField('policy',d.policy);
+ setField('closing',d.closing);
+ setField('catalogStyle',d.catalogStyle||'minimal');
+ coverData=d.coverPhoto||'';
+ logoData=draft.logoData||'';
+ const mode=document.querySelector(`input[name="mode"][value="${d.mode||'retail'}"]`);
+ if(mode)mode.checked=true;
+ $('products').innerHTML='';
+ (d.products||[]).forEach(product=>addProduct(product));
+ if(!$('products').children.length)addProduct();
+ $('formPanel').classList.remove('hidden');
+ $('previewPanel').classList.add('hidden');
+ showPage(0);
+ window.scrollTo({top:0,behavior:'smooth'});
+ toast('Rascunho aberto! Você já pode continuar editando.');
+}
+$('saveDraftFile').onclick=downloadDraft;
+$('openDraftFile').onclick=()=>$('draftFile').click();
+$('draftFile').onchange=async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ try{
+  const content=await file.text();
+  const draft=JSON.parse(content);
+  if(draft.format!=='atelie-inteligente-draft')throw new Error('Formato de arquivo não reconhecido.');
+  restoreDraft(draft);
+ }catch(err){
+  console.error(err);toast('Não consegui abrir esse arquivo. Selecione um rascunho exportado por esta ferramenta.');
+ }finally{e.target.value=''}
+};
+
 $('next').onclick=()=>{if(current===0&&!val('brandName')){toast('Informe o nome da sua marca para continuar.');$('brandName').focus();return}if(current===2&&!getData().products.length){toast('Adicione pelo menos uma peça com nome.');return}if(current<4)showPage(current+1);else{$('formPanel').classList.add('hidden');$('previewPanel').classList.remove('hidden');render();window.scrollTo({top:0,behavior:'smooth'})}};$('back').onclick=()=>showPage(Math.max(0,current-1));$('edit').onclick=()=>{$('previewPanel').classList.add('hidden');$('formPanel').classList.remove('hidden');showPage(4);window.scrollTo({top:0,behavior:'smooth'})};$('addProduct').onclick=()=>addProduct();$('products').addEventListener('input',()=>{});$('logo').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>logoData=r.result;r.readAsDataURL(f)};$('coverPhoto').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>coverData=r.result;r.readAsDataURL(f)};document.querySelectorAll('input[name=mode]').forEach(x=>x.onchange=render);$('export').onclick=()=>{
   render();
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
